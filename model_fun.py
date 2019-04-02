@@ -15,11 +15,11 @@ DATA_FORMAT = 'NCHW'
 
 
 
-def create_model_exp(features, data_format, all_num_anchors_depth, num_classes):
+def create_model_exp(features, data_format, all_num_anchors_depth, num_classes, isTraining=True):
 
     with tf.variable_scope('ssd300', default_name=None, values=[features], reuse=tf.AUTO_REUSE):
         backbone = ssd_net.VGG16Backbone(data_format)
-        feature_layers = backbone.forward(features, training=True)
+        feature_layers = backbone.forward(features, training=isTraining)
         # print(feature_layers)
         location_pred, cls_pred = ssd_net.multibox_head(feature_layers,
                                                         num_classes,
