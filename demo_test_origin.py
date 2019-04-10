@@ -37,7 +37,7 @@ with slim.arg_scope(ssd_net.arg_scope(data_format=data_format)):
 
 # Restore SSD model.
 ckpt_filename = 'checkpoints/ssd_300_vgg.ckpt'
-# ckpt_filename = '../checkpoints/VGG_VOC0712_SSD_300x300_ft_iter_120000.ckpt'
+ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd_wayze_train_logs/origin_training/model.ckpt-90000'
 isess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 saver.restore(isess, ckpt_filename)
@@ -70,7 +70,7 @@ def process_image(img, select_threshold=0.5, nms_threshold=.45, net_shape=(300, 
 path = '/home/ai/DataDisk/wayze/tensorflow/JPEGImages/'
 image_names = sorted(os.listdir(path))
 # 文件夹中的第几张图，-1代表最后一张
-img = mpimg.imread(path + image_names[-1])
+img = mpimg.imread(path + image_names[200])
 rclasses, rscores, rbboxes = process_image(img)
 
 # visualization.bboxes_draw_on_img(img, rclasses, rscores, rbboxes, visualization.colors_plasma)

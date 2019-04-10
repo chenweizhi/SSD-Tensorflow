@@ -38,3 +38,14 @@ def create_model_exp(features, data_format, all_num_anchors_depth, num_classes, 
             for (idx, pred) in enumerate(location_pred)]
 
     return cls_pred, location_pred
+
+
+
+def flatten(x):
+    result = []
+    for el in x:
+        if isinstance(el, tuple):
+            result.extend(flatten(el))
+        else:
+            result.append(el)
+    return result

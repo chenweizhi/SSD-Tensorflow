@@ -28,7 +28,8 @@ from tensorflow.python.framework import ops
 from datasets import dataset_factory
 from nets import nets_factory
 from preprocessing import preprocessing_factory
-from model_fun  import create_model_exp
+from model_fun import create_model_exp
+from model_fun import flatten
 
 slim = tf.contrib.slim
 
@@ -103,16 +104,6 @@ tf.app.flags.DEFINE_boolean(
 
 
 FLAGS = tf.app.flags.FLAGS
-
-
-def flatten(x):
-    result = []
-    for el in x:
-        if isinstance(el, tuple):
-            result.extend(flatten(el))
-        else:
-            result.append(el)
-    return result
 
 
 def main(_):
