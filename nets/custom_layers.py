@@ -103,12 +103,18 @@ def l2_normalization(
                                              initializer=scale_initializer,
                                              collections=scale_collections,
                                              trainable=trainable)
+            weight_scale = tf.Variable([20.] * 512, trainable=True, name='weight_scale')
             if data_format == 'NHWC':
-                outputs = tf.multiply(outputs, scale)
+                weight_scale = tf.reshape(weight_scale, [1, 1, 1, -1], name='reshape')
+            else:
+                weight_scale = tf.reshape(weight_scale, [1, -1, 1, 1], name='reshape')
+
+            if data_format == 'NHWC':
+                outputs = tf.multiply(outputs, weight_scale)
             elif data_format == 'NCHW':
                 scale = tf.expand_dims(scale, axis=-1)
                 scale = tf.expand_dims(scale, axis=-1)
-                outputs = tf.multiply(outputs, scale)
+                outputs = tf.multiply(outputs, weight_scale)
                 # outputs = tf.transpose(outputs, perm=(0, 2, 3, 1))
 
         return utils.collect_named_outputs(outputs_collections,
