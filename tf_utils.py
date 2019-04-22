@@ -119,7 +119,7 @@ def configure_learning_rate(flags, num_samples_per_epoch, global_step):
                                          cycle=False,
                                          name='polynomial_decay_learning_rate')
     elif flags.learning_rate_decay_type == 'piecewise':
-        l_values = [flags.learning_rate * e for e in [0.1, 1, 0.1, 0.01]]
+        l_values = [flags.learning_rate * e for e in [0.1, 0.2, 0.1, 0.01]]
         learning_rate = tf.train.piecewise_constant(global_step, [20000, 50000, 90000], l_values)
         return tf.maximum(learning_rate,
                           tf.constant(flags.end_learning_rate, dtype=learning_rate.dtype),
