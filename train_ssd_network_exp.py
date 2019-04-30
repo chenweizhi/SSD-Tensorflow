@@ -23,6 +23,7 @@ from preprocessing import preprocessing_factory
 import tf_utils
 from utility import scaffolds
 from model_fun import create_model_exp
+from preprocessing import ssd_preprocessing
 
 slim = tf.contrib.slim
 
@@ -219,6 +220,9 @@ def main(_):
 
         tf_utils.print_configuration(FLAGS.__flags, ssd_params,
                                      dataset.data_sources, FLAGS.train_dir)
+
+        data_format = 'channels_first'
+
         # =================================================================== #
         # Create a dataset provider and batches.
         # =================================================================== #
@@ -235,10 +239,21 @@ def main(_):
                                                              'object/label',
                                                              'object/bbox'])
             # Pre-processing image, labels and bboxes.
-            image, glabels, gbboxes = \
-                image_preprocessing_fn(image, glabels, gbboxes,
-                                       out_shape=ssd_shape,
-                                       data_format=DATA_FORMAT)
+            # image, glabels, gbboxes = \
+            #     image_preprocessing_fn(image, glabels, gbboxes,
+            #                            out_shape=ssd_shape,
+            #                            data_format=DATA_FORMAT)
+            out_shape = [ i for i in ssd_shape]
+            image, glabels, gbboxes = ssd_preprocessing.preprocess_image(image,
+                                                                         glabels,
+                                                                         gbboxes,
+                                                                         out_shape,
+                                                                       is_training=True,
+                                                                       data_format=data_format,
+                                                                       output_rgb=True)
+
+
+
             # Encode groundtruth labels and bboxes.
             gclasses, glocalisations, gscores = \
                 ssd_net_origin.bboxes_encode(glabels, gbboxes, ssd_anchors)
@@ -266,7 +281,7 @@ def main(_):
 
         #new add
         all_num_anchors_depth = [len(ele[2]) for ele in ssd_anchors]
-        data_format = 'channels_first'
+
         # with tf.variable_scope('ssd300', default_name=None, values=[b_image], reuse=tf.AUTO_REUSE):
         #     backbone = ssd_net.VGG16Backbone(data_format)
         #     feature_layers = backbone.forward(b_image, training=True)

@@ -30,6 +30,7 @@ from nets import nets_factory
 from preprocessing import preprocessing_factory
 from model_fun import create_model_exp
 from model_fun import flatten
+from preprocessing import ssd_preprocessing
 
 slim = tf.contrib.slim
 
@@ -136,6 +137,9 @@ def main(_):
 
         tf_utils.print_configuration(FLAGS.__flags, ssd_params,
                                      dataset.data_sources, FLAGS.eval_dir)
+
+        data_format = 'channels_last'
+
         # =================================================================== #
         # Create a dataset provider and batches.
         # =================================================================== #
@@ -156,12 +160,20 @@ def main(_):
                 gdifficults = tf.zeros(tf.shape(glabels), dtype=tf.int64)
 
             # Pre-processing image, labels and bboxes.
-            image, glabels, gbboxes, gbbox_img = \
-                image_preprocessing_fn(image, glabels, gbboxes,
-                                       out_shape=ssd_shape,
-                                       data_format=DATA_FORMAT,
-                                       resize=FLAGS.eval_resize,
-                                       difficults=None)
+            # image, glabels, gbboxes, gbbox_img = \
+            #     image_preprocessing_fn(image, glabels, gbboxes,
+            #                            out_shape=ssd_shape,
+            #                            data_format=DATA_FORMAT,
+            #                            resize=FLAGS.eval_resize,
+            #                            difficults=None)
+            out_shape = [i for i in ssd_shape]
+            image, glabels, gbboxes = ssd_preprocessing.preprocess_image(image,
+                                                                         glabels,
+                                                                         gbboxes,
+                                                                         out_shape,
+                                                                       is_training=False,
+                                                                       data_format=data_format,
+                                                                       output_rgb=True)
 
             # Encode groundtruth labels and bboxes.
             gclasses, glocalisations, gscores = \
@@ -192,7 +204,7 @@ def main(_):
         #                b_gclasses, b_glocalisations, b_gscores)
 
         all_num_anchors_depth = [len(ele[2]) for ele in ssd_anchors]
-        data_format = 'channels_last'
+
 
         cls_pred, location_pred = create_model_exp(b_image, data_format, all_num_anchors_depth, FLAGS.num_classes, False)
         ssd_net_origin.losses(cls_pred, location_pred,
