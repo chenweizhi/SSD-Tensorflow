@@ -43,7 +43,7 @@ prediction = [tf.nn.softmax(pred) for pred in cls_pred]
 
 # Restore SSD model.
 #ckpt_filename = '../checkpoints/ssd_300_vgg.ckpt'
-ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd-tensorflow-exp/logs/model.ckpt-92330'
+ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd-tensorflow-exp/piecewise/model.ckpt-90000'
 isess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 saver.restore(isess, ckpt_filename)
@@ -71,14 +71,46 @@ def process_image(img, select_threshold=0.5, nms_threshold=.45, net_shape=(300, 
     return rclasses, rscores, rbboxes
 
 
+
 # Test on some demo image and visualize output.
 # 测试的文件夹
-path = '/home/ai/DataDisk/wayze/tensorflow/JPEGImages/'
+path = '/home/ai/DataDisk/wayze/tensorflow/voc2007/test/'
+result_folder = '/home/ai/DataDisk/wayze/tensorflow/voc2007/result/'
 image_names = sorted(os.listdir(path))
-# 文件夹中的第几张图，-1代表最后一张
-img = mpimg.imread(path + image_names[60])
-rclasses, rscores, rbboxes = process_image(img)
 
-# visualization.bboxes_draw_on_img(img, rclasses, rscores, rbboxes, visualization.colors_plasma)
-visualization.plt_bboxes(img, rclasses, rscores, rbboxes)
+colors = []
+for i in range(21):
+    colors.append([random.random()*255, random.random()*255, random.random()*255])
+
+class_names = ['none',
+    'aeroplane',
+    'bicycle',
+    'bird',
+    'boat',
+    'bottle',
+    'bus',
+    'car',
+    'cat',
+    'chair',
+    'cow',
+    'diningtable',
+    'dog',
+    'horse',
+    'motorbike',
+    'person',
+    'pottedplant',
+    'sheep',
+    'sofa',
+    'train',
+    'tvmonitor',
+    'total'];
+
+for i in range(512):
+    # 文件夹中的第几张图，-1代表最后一张
+    img = cv2.imread(path + image_names[i])
+    rclasses, rscores, rbboxes = process_image(img)
+    visualization.bboxes_draw_on_img(img, rclasses, rscores, rbboxes, colors, class_names)
+    cv2.imwrite(os.path.join(result_folder,image_names[i]), img)
+    # visualization.bboxes_draw_on_img(img, rclasses, rscores, rbboxes, visualization.colors_plasma)
+    #visualization.plt_bboxes(img, rclasses, rscores, rbboxes)
 

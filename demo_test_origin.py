@@ -37,7 +37,7 @@ with slim.arg_scope(ssd_net.arg_scope(data_format=data_format)):
 
 # Restore SSD model.
 ckpt_filename = 'checkpoints/ssd_300_vgg.ckpt'
-ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd_wayze_train_logs/origin_polynomail_momentum_train_dropoutDel_scale20_overfitting/model.ckpt-90000'
+ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd_wayze_train_logs/origin_polynomail_momentum_train_dropoutDel_scale20_overfitting_divValidCount_all/model.ckpt-90000'
 isess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 saver.restore(isess, ckpt_filename)
@@ -67,7 +67,7 @@ def process_image(img, select_threshold=0.5, nms_threshold=.45, net_shape=(300, 
 
 # Test on some demo image and visualize output.
 # 测试的文件夹
-path = '/home/ai/DataDisk/wayze/tensorflow/voc2007/train/'
+path = '/home/ai/DataDisk/wayze/tensorflow/voc2007/test/'
 result_folder = '/home/ai/DataDisk/wayze/tensorflow/voc2007/result/'
 image_names = sorted(os.listdir(path))
 
@@ -103,6 +103,6 @@ for i in range(512):
     img = cv2.imread(path + image_names[i])
     rclasses, rscores, rbboxes = process_image(img)
     visualization.bboxes_draw_on_img(img, rclasses, rscores, rbboxes, colors, class_names)
-    cv2.imwrite(os.path.join(result_folder,image_names[i]), img);
+    cv2.imwrite(os.path.join(result_folder,image_names[i]), img)
     # visualization.bboxes_draw_on_img(img, rclasses, rscores, rbboxes, visualization.colors_plasma)
     #visualization.plt_bboxes(img, rclasses, rscores, rbboxes)
