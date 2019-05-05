@@ -31,6 +31,7 @@ from preprocessing import preprocessing_factory
 from model_fun import create_model_exp
 from model_fun import flatten
 from preprocessing import ssd_preprocessing
+from utility import anchor_manipulator
 
 slim = tf.contrib.slim
 
@@ -209,6 +210,24 @@ def main(_):
         # ssd_net_origin.losses(logits, localisations,
         #                b_gclasses, b_glocalisations, b_gscores)
 
+        out_shape = ssd_shape #[FLAGS.train_image_size] * 2
+        anchor_creator = anchor_manipulator.AnchorCreator(out_shape,
+                                                    layers_shapes = [(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
+                                                    anchor_scales = [(0.1,), (0.2,), (0.375,), (0.55,), (0.725,), (0.9,)],
+                                                    extra_anchor_scales = [(0.1414,), (0.2739,), (0.4541,), (0.6315,), (0.8078,), (0.9836,)],
+                                                    anchor_ratios = [(1., 2., .5), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., .5), (1., 2., .5)],
+                                                    layer_steps = [8, 16, 32, 64, 100, 300])
+        all_anchors, all_num_anchors_depth, all_num_anchors_spatial = anchor_creator.get_all_anchors()
+
+        num_anchors_per_layer = []
+        for ind in range(len(all_anchors)):
+            num_anchors_per_layer.append(all_num_anchors_depth[ind] * all_num_anchors_spatial[ind])
+
+        anchor_encoder_decoder = anchor_manipulator.AnchorEncoder(allowed_borders = [1.0] * 6,
+                                                            positive_threshold = FLAGS.match_threshold,
+                                                            ignore_threshold = 0.5, #FLAGS.neg_threshold,
+                                                            prior_scaling=[0.1, 0.1, 0.2, 0.2])
+
         all_num_anchors_depth = [len(ele[2]) for ele in ssd_anchors]
 
 
@@ -216,10 +235,15 @@ def main(_):
         ssd_net_origin.losses(cls_pred, location_pred,
                               b_gclasses, b_glocalisations, b_gscores)
         predictions = [tf.nn.softmax(pred) for pred in cls_pred]
+
+
         # Performing post-processing on CPU: loop-intensive, usually more efficient.
         with tf.device('/device:CPU:0'):
             # Detected objects from SSD output.
             localisations = ssd_net_origin.bboxes_decode(location_pred, ssd_anchors)
+
+            localisations_new = anchor_encoder_decoder.decode_all_anchors(location_pred, num_anchors_per_layer)
+
             rscores, rbboxes = \
                 ssd_net_origin.detected_bboxes(predictions, localisations,
                                         select_threshold=FLAGS.select_threshold,
