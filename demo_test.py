@@ -43,7 +43,7 @@ prediction = [tf.nn.softmax(pred) for pred in cls_pred]
 
 # Restore SSD model.
 #ckpt_filename = '../checkpoints/ssd_300_vgg.ckpt'
-ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd-tensorflow-exp/piecewise/model.ckpt-90000'
+ckpt_filename = '/home/ai/DataDisk/wayze/tensorflow/ssd-tensorflow-exp/piecewise_new_preprocess/model.ckpt-90000'
 isess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 saver.restore(isess, ckpt_filename)

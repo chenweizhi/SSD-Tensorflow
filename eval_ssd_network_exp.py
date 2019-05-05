@@ -160,20 +160,26 @@ def main(_):
                 gdifficults = tf.zeros(tf.shape(glabels), dtype=tf.int64)
 
             # Pre-processing image, labels and bboxes.
-            # image, glabels, gbboxes, gbbox_img = \
-            #     image_preprocessing_fn(image, glabels, gbboxes,
-            #                            out_shape=ssd_shape,
-            #                            data_format=DATA_FORMAT,
-            #                            resize=FLAGS.eval_resize,
-            #                            difficults=None)
-            out_shape = [i for i in ssd_shape]
-            image, glabels, gbboxes = ssd_preprocessing.preprocess_image(image,
-                                                                         glabels,
-                                                                         gbboxes,
-                                                                         out_shape,
-                                                                       is_training=False,
-                                                                       data_format=data_format,
-                                                                       output_rgb=True)
+            image, glabels, gbboxes, gbbox_img = \
+                image_preprocessing_fn(image, glabels, gbboxes,
+                                       out_shape=ssd_shape,
+                                       data_format=DATA_FORMAT,
+                                       resize=FLAGS.eval_resize,
+                                       difficults=None)
+
+            #It is weried that the function would return image only when is_training = false
+            # out_shape = [i for i in ssd_shape]
+            # image, glabels, gbboxes = ssd_preprocessing.preprocess_image(image,
+            #                                                              glabels,
+            #                                                              gbboxes,
+            #                                                              out_shape,
+            #                                                            is_training=True,
+            #                                                            data_format=data_format,
+            #                                                            output_rgb=True)
+            # #It turns out that ssd_preprocessing would remove difficults
+            # #leds to error of non-match shape
+            # gdifficults = tf.zeros(tf.shape(glabels), dtype=tf.int64)
+            # gbbox_img = gbboxes[0]
 
             # Encode groundtruth labels and bboxes.
             gclasses, glocalisations, gscores = \

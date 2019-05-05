@@ -271,8 +271,10 @@ def bboxes_matching(label, scores, bboxes,
         rlabel = tf.cast(label, glabels.dtype)
         # Number of groundtruth boxes.
         gdifficults = tf.cast(gdifficults, tf.bool)
+        #gdifficults = tf.Print(gdifficults, [glabels, label, gdifficults, 'any thing i want'], message='Debug message:', summarize=20)
         n_gbboxes = tf.count_nonzero(tf.logical_and(tf.equal(glabels, label),
                                                     tf.logical_not(gdifficults)))
+
         # Grountruth matching arrays.
         gmatch = tf.zeros(tf.shape(glabels), dtype=tf.bool)
         grange = tf.range(tf.size(glabels), dtype=tf.int32)
