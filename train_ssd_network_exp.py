@@ -24,6 +24,7 @@ import tf_utils
 from utility import scaffolds
 from model_fun import create_model_exp
 from preprocessing import ssd_preprocessing
+from utility import anchor_manipulator
 
 slim = tf.contrib.slim
 
@@ -181,6 +182,22 @@ tf.app.flags.DEFINE_boolean(
 FLAGS = tf.app.flags.FLAGS
 
 
+def split_encoder(array, all_anchors):
+
+    indcies = [0] + [int(all_anchors[i][0].shape[0]*all_anchors[i][0].shape[1]*all_anchors[i][2].shape[0]) for i in range(len(all_anchors))]
+
+    array_first = []
+    index = 0
+    for i in range(len(indcies) - 1):
+        array_first.append(array[index:(index+indcies[i+1]), ...])
+        index += indcies[i+1]
+    print(len(array.shape))
+    if len(array.shape) > 1:
+        return [tf.reshape(array_first[i], (all_anchors[i][0].shape[0], all_anchors[i][0].shape[1], all_anchors[i][2].shape[0], array_first[i].shape[-1])) for i in range(len(all_anchors))]
+    else:
+        return [tf.reshape(array_first[i], (all_anchors[i][0].shape[0], all_anchors[i][0].shape[1], all_anchors[i][2].shape[0])) for i in range(len(all_anchors))]
+
+
 # =========================================================================== #
 # Main training routine.
 # =========================================================================== #
@@ -221,6 +238,25 @@ def main(_):
         tf_utils.print_configuration(FLAGS.__flags, ssd_params,
                                      dataset.data_sources, FLAGS.train_dir)
 
+
+        out_shape = ssd_shape #[FLAGS.train_image_size] * 2
+        anchor_creator = anchor_manipulator.AnchorCreator(out_shape,
+                                                    layers_shapes = [(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
+                                                    anchor_scales = [(0.1,), (0.2,), (0.375,), (0.55,), (0.725,), (0.9,)],
+                                                    extra_anchor_scales = [(0.1414,), (0.2739,), (0.4541,), (0.6315,), (0.8078,), (0.9836,)],
+                                                    anchor_ratios = [(1., 2., .5), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., .5), (1., 2., .5)],
+                                                    layer_steps = [8, 16, 32, 64, 100, 300])
+        all_anchors, all_num_anchors_depth, all_num_anchors_spatial = anchor_creator.get_all_anchors()
+
+        num_anchors_per_layer = []
+        for ind in range(len(all_anchors)):
+            num_anchors_per_layer.append(all_num_anchors_depth[ind] * all_num_anchors_spatial[ind])
+
+        anchor_encoder_decoder = anchor_manipulator.AnchorEncoder(allowed_borders = [1.0] * 6,
+                                                            positive_threshold = FLAGS.match_threshold,
+                                                            ignore_threshold = 0.5, #FLAGS.neg_threshold,
+                                                            prior_scaling=[0.1, 0.1, 0.2, 0.2])
+
         data_format = 'channels_first'
 
         # =================================================================== #
@@ -255,16 +291,30 @@ def main(_):
 
 
             # Encode groundtruth labels and bboxes.
-            gclasses, glocalisations, gscores = \
-                ssd_net_origin.bboxes_encode(glabels, gbboxes, ssd_anchors)
+            # gclasses, glocalisations, gscores = \
+            #     ssd_net_origin.bboxes_encode(glabels, gbboxes, ssd_anchors)
+
+            gt_targets, gt_labels, gt_scores = anchor_encoder_decoder.encode_all_anchors(glabels, gbboxes, all_anchors, all_num_anchors_depth,
+                                                      all_num_anchors_spatial)
+
+            gt_targets = split_encoder(gt_targets, all_anchors)
+            gt_labels = split_encoder(gt_labels, all_anchors)
+            gt_scores = split_encoder(gt_scores, all_anchors)
+
             batch_shape = [1] + [len(ssd_anchors)] * 3
 
             # Training batches and queue.
+            # r = tf.train.batch(
+            #     tf_utils.reshape_list([image, gclasses, glocalisations, gscores]),
+            #     batch_size=FLAGS.batch_size,
+            #     num_threads=FLAGS.num_preprocessing_threads,
+            #     capacity=5 * FLAGS.batch_size)
             r = tf.train.batch(
-                tf_utils.reshape_list([image, gclasses, glocalisations, gscores]),
+                tf_utils.reshape_list([image, gt_labels, gt_targets, gt_scores]),
                 batch_size=FLAGS.batch_size,
                 num_threads=FLAGS.num_preprocessing_threads,
                 capacity=5 * FLAGS.batch_size)
+
             b_image, b_gclasses, b_glocalisations, b_gscores = \
                 tf_utils.reshape_list(r, batch_shape)
 
