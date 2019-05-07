@@ -32,6 +32,7 @@ from model_fun import create_model_exp
 from model_fun import flatten
 from preprocessing import ssd_preprocessing
 from utility import anchor_manipulator
+from model_fun import split_encoder
 
 slim = tf.contrib.slim
 
@@ -141,6 +142,32 @@ def main(_):
 
         data_format = 'channels_last'
 
+        out_shape = ssd_shape  # [FLAGS.train_image_size] * 2
+        anchor_creator = anchor_manipulator.AnchorCreator(out_shape,
+                                                          layers_shapes=[(38, 38), (19, 19), (10, 10), (5, 5), (3, 3),
+                                                                         (1, 1)],
+                                                          anchor_scales=[(0.1,), (0.2,), (0.375,), (0.55,), (0.725,),
+                                                                         (0.9,)],
+                                                          extra_anchor_scales=[(0.1414,), (0.2739,), (0.4541,),
+                                                                               (0.6315,), (0.8078,), (0.9836,)],
+                                                          anchor_ratios=[(1., 2., .5), (1., 2., 3., .5, 0.3333),
+                                                                         (1., 2., 3., .5, 0.3333),
+                                                                         (1., 2., 3., .5, 0.3333), (1., 2., .5),
+                                                                         (1., 2., .5)],
+                                                          layer_steps=[8, 16, 32, 64, 100, 300])
+        all_anchors, all_num_anchors_depth, all_num_anchors_spatial = anchor_creator.get_all_anchors()
+
+        num_anchors_per_layer = []
+        for ind in range(len(all_anchors)):
+            num_anchors_per_layer.append(all_num_anchors_depth[ind] * all_num_anchors_spatial[ind])
+
+        anchor_encoder_decoder = anchor_manipulator.AnchorEncoder(allowed_borders=[1.0] * 6,
+                                                                  positive_threshold=0.5,  # FLAGS.match_threshold,
+                                                                  ignore_threshold=0.5,  # FLAGS.neg_threshold,
+                                                                  prior_scaling=[0.1, 0.1, 0.2, 0.2])
+
+        all_num_anchors_depth = [len(ele[2]) for ele in ssd_anchors]
+
         # =================================================================== #
         # Create a dataset provider and batches.
         # =================================================================== #
@@ -161,32 +188,42 @@ def main(_):
                 gdifficults = tf.zeros(tf.shape(glabels), dtype=tf.int64)
 
             # Pre-processing image, labels and bboxes.
-            image, glabels, gbboxes, gbbox_img = \
-                image_preprocessing_fn(image, glabels, gbboxes,
-                                       out_shape=ssd_shape,
-                                       data_format=DATA_FORMAT,
-                                       resize=FLAGS.eval_resize,
-                                       difficults=None)
+            # image, glabels, gbboxes, gbbox_img = \
+            #     image_preprocessing_fn(image, glabels, gbboxes,
+            #                            out_shape=ssd_shape,
+            #                            data_format=DATA_FORMAT,
+            #                            resize=FLAGS.eval_resize,
+            #                            difficults=None)
+
 
             #It is weried that the function would return image only when is_training = false
-            # out_shape = [i for i in ssd_shape]
-            # image, glabels, gbboxes = ssd_preprocessing.preprocess_image(image,
-            #                                                              glabels,
-            #                                                              gbboxes,
-            #                                                              out_shape,
-            #                                                            is_training=True,
-            #                                                            data_format=data_format,
-            #                                                            output_rgb=True)
-            # #It turns out that ssd_preprocessing would remove difficults
-            # #leds to error of non-match shape
-            # gdifficults = tf.zeros(tf.shape(glabels), dtype=tf.int64)
-            # gbbox_img = gbboxes[0]
+            out_shape = [i for i in ssd_shape]
+            image, glabels, gbboxes = ssd_preprocessing.preprocess_image(image,
+                                                                         glabels,
+                                                                         gbboxes,
+                                                                         out_shape,
+                                                                       is_training=True,
+                                                                       data_format=data_format,
+                                                                       output_rgb=True)
 
-            # Encode groundtruth labels and bboxes.
+            #It turns out that ssd_preprocessing would remove difficults
+            #leds to error of non-match shape
+            gdifficults = tf.zeros(tf.shape(glabels), dtype=tf.int64)
+            gbbox_img = gbboxes[0]
+
+            #Encode groundtruth labels and bboxes.
             gclasses, glocalisations, gscores = \
                 ssd_net_origin.bboxes_encode(glabels, gbboxes, ssd_anchors)
-            batch_shape = [1] * 5 + [len(ssd_anchors)] * 3
 
+            gt_targets, gt_labels, gt_scores = anchor_encoder_decoder.encode_all_anchors(glabels, gbboxes, all_anchors, all_num_anchors_depth,
+                                                      all_num_anchors_spatial)
+
+            # gt_targets = split_encoder(gt_targets, all_anchors)
+            # gt_labels = split_encoder(gt_labels, all_anchors)
+            # gt_scores = split_encoder(gt_scores, all_anchors)
+            # batch_shape = [1] + [len(ssd_anchors)] * 3
+
+            batch_shape = [1] * 5 + [len(ssd_anchors)] * 3
             # Evaluation batch.
             r = tf.train.batch(
                 tf_utils.reshape_list([image, glabels, gbboxes, gdifficults, gbbox_img,
@@ -195,6 +232,12 @@ def main(_):
                 num_threads=FLAGS.num_preprocessing_threads,
                 capacity=5 * FLAGS.batch_size,
                 dynamic_pad=True)
+            # r = tf.train.batch(
+            #     tf_utils.reshape_list([image, gt_labels, gt_targets, gt_scores]),
+            #     batch_size=FLAGS.batch_size,
+            #     num_threads=FLAGS.num_preprocessing_threads,
+            #     capacity=5 * FLAGS.batch_size)
+
             (b_image, b_glabels, b_gbboxes, b_gdifficults, b_gbbox_img, b_gclasses,
              b_glocalisations, b_gscores) = tf_utils.reshape_list(r, batch_shape)
 
@@ -210,26 +253,6 @@ def main(_):
         # ssd_net_origin.losses(logits, localisations,
         #                b_gclasses, b_glocalisations, b_gscores)
 
-        out_shape = ssd_shape #[FLAGS.train_image_size] * 2
-        anchor_creator = anchor_manipulator.AnchorCreator(out_shape,
-                                                    layers_shapes = [(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
-                                                    anchor_scales = [(0.1,), (0.2,), (0.375,), (0.55,), (0.725,), (0.9,)],
-                                                    extra_anchor_scales = [(0.1414,), (0.2739,), (0.4541,), (0.6315,), (0.8078,), (0.9836,)],
-                                                    anchor_ratios = [(1., 2., .5), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., .5), (1., 2., .5)],
-                                                    layer_steps = [8, 16, 32, 64, 100, 300])
-        all_anchors, all_num_anchors_depth, all_num_anchors_spatial = anchor_creator.get_all_anchors()
-
-        num_anchors_per_layer = []
-        for ind in range(len(all_anchors)):
-            num_anchors_per_layer.append(all_num_anchors_depth[ind] * all_num_anchors_spatial[ind])
-
-        anchor_encoder_decoder = anchor_manipulator.AnchorEncoder(allowed_borders = [1.0] * 6,
-                                                            positive_threshold = FLAGS.match_threshold,
-                                                            ignore_threshold = 0.5, #FLAGS.neg_threshold,
-                                                            prior_scaling=[0.1, 0.1, 0.2, 0.2])
-
-        all_num_anchors_depth = [len(ele[2]) for ele in ssd_anchors]
-
 
         cls_pred, location_pred = create_model_exp(b_image, data_format, all_num_anchors_depth, FLAGS.num_classes, False)
         ssd_net_origin.losses(cls_pred, location_pred,
@@ -242,10 +265,15 @@ def main(_):
             # Detected objects from SSD output.
             localisations = ssd_net_origin.bboxes_decode(location_pred, ssd_anchors)
 
-            localisations_new = anchor_encoder_decoder.decode_all_anchors(location_pred, num_anchors_per_layer)
+            location_pred_re = [tf.reshape(pre, (pre.shape[0], -1, pre.shape[-1])) for pre in location_pred]
+            location_pred_re = tf.concat(location_pred_re, axis=1)
+            location_pred_re = tf.reshape(location_pred_re, (-1, location_pred_re.shape[-1]))
+
+            localisations_new = anchor_encoder_decoder.decode_all_anchors(location_pred_re, num_anchors_per_layer)
+            localisations_new = [ tf.reshape(pred, localisations[idx].shape) for (idx,pred) in enumerate(localisations_new)]
 
             rscores, rbboxes = \
-                ssd_net_origin.detected_bboxes(predictions, localisations,
+                ssd_net_origin.detected_bboxes(predictions, localisations_new,
                                         select_threshold=FLAGS.select_threshold,
                                         nms_threshold=FLAGS.nms_threshold,
                                         clipping_bbox=None,

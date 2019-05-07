@@ -25,6 +25,7 @@ from utility import scaffolds
 from model_fun import create_model_exp
 from preprocessing import ssd_preprocessing
 from utility import anchor_manipulator
+from model_fun import split_encoder
 
 slim = tf.contrib.slim
 
@@ -182,20 +183,6 @@ tf.app.flags.DEFINE_boolean(
 FLAGS = tf.app.flags.FLAGS
 
 
-def split_encoder(array, all_anchors):
-
-    indcies = [0] + [int(all_anchors[i][0].shape[0]*all_anchors[i][0].shape[1]*all_anchors[i][2].shape[0]) for i in range(len(all_anchors))]
-
-    array_first = []
-    index = 0
-    for i in range(len(indcies) - 1):
-        array_first.append(array[index:(index+indcies[i+1]), ...])
-        index += indcies[i+1]
-    print(len(array.shape))
-    if len(array.shape) > 1:
-        return [tf.reshape(array_first[i], (all_anchors[i][0].shape[0], all_anchors[i][0].shape[1], all_anchors[i][2].shape[0], array_first[i].shape[-1])) for i in range(len(all_anchors))]
-    else:
-        return [tf.reshape(array_first[i], (all_anchors[i][0].shape[0], all_anchors[i][0].shape[1], all_anchors[i][2].shape[0])) for i in range(len(all_anchors))]
 
 
 # =========================================================================== #
