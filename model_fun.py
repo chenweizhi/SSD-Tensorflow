@@ -129,14 +129,14 @@ def get_losses(features, cls_pred, location_pred,
     # flaten_cls_targets=tf.Print(flaten_cls_targets, [flaten_loc_targets],summarize=50000)
     cross_entropy = tf.losses.sparse_softmax_cross_entropy(labels=flaten_cls_targets, logits=cls_pred) #* (params['negative_ratio'] + 1.)
     # Create a tensor named cross_entropy for logging purposes.
-    tf.identity(cross_entropy, name='cross_entropy_loss')
-    tf.summary.scalar('cross_entropy_loss', cross_entropy)
+    #tf.identity(cross_entropy, name='cross_entropy_loss')
+    #tf.summary.scalar('cross_entropy_loss', cross_entropy)
 
     # loc_loss = tf.cond(n_positives > 0, lambda: modified_smooth_l1(location_pred, tf.stop_gradient(flaten_loc_targets), sigma=1.), lambda: tf.zeros_like(location_pred))
     loc_loss = modified_smooth_l1(location_pred, flaten_loc_targets, sigma=1.)
     # loc_loss = modified_smooth_l1(location_pred, tf.stop_gradient(gtargets))
     loc_loss = tf.reduce_mean(tf.reduce_sum(loc_loss, axis=-1), name='location_loss')
-    tf.summary.scalar('location_loss', loc_loss)
+    #tf.summary.scalar('location_loss', loc_loss)
     tf.losses.add_loss(loc_loss)
 
     l2_loss_vars = []
@@ -150,6 +150,7 @@ def get_losses(features, cls_pred, location_pred,
     # doing so leads to a small improvement in accuracy.
     total_loss = tf.add(cross_entropy + loc_loss,
                         tf.multiply(FLAGS.weight_decay, tf.add_n(l2_loss_vars), name='l2_loss'), name='total_loss')
+    tf.summary.scalar('total_loss', total_loss)
 
     return total_loss
 
