@@ -26,6 +26,7 @@ from model_fun import create_model_exp
 from preprocessing import ssd_preprocessing
 from utility import anchor_manipulator
 from model_fun import split_encoder
+import model_fun
 
 slim = tf.contrib.slim
 
@@ -335,12 +336,15 @@ def main(_):
         #     cls_pred = [tf.reshape(pred, [tf.shape(pred)[0],tf.shape(pred)[1],tf.shape(pred)[2],  all_num_anchors_depth[idx], FLAGS.num_classes]) for (idx, pred) in enumerate(cls_pred)]
         #     location_pred = [tf.reshape(pred, [tf.shape(pred)[0],tf.shape(pred)[1],tf.shape(pred)[2], all_num_anchors_depth[idx], 4]) for (idx, pred) in enumerate(location_pred)]
         cls_pred, location_pred = create_model_exp(b_image, data_format, all_num_anchors_depth, FLAGS.num_classes)
-        ssd_net_origin.losses(cls_pred, location_pred,
-                              b_gclasses, b_glocalisations, b_gscores,
-                              match_threshold=FLAGS.match_threshold,
-                              negative_ratio=FLAGS.negative_ratio,
-                              alpha=FLAGS.loss_alpha,
-                              label_smoothing=FLAGS.label_smoothing)
+
+        total_loss = model_fun.get_losses(b_image, cls_pred, location_pred, b_gclasses, b_glocalisations, FLAGS)
+
+        # ssd_net_origin.losses(cls_pred, location_pred,
+        #                       b_gclasses, b_glocalisations, b_gscores,
+        #                       match_threshold=FLAGS.match_threshold,
+        #                       negative_ratio=FLAGS.negative_ratio,
+        #                       alpha=FLAGS.loss_alpha,
+        #                       label_smoothing=FLAGS.label_smoothing)
         # =================================================================== #
         # Define the model running on every GPU.
         # =================================================================== #
@@ -423,8 +427,9 @@ def main(_):
         # Variables to train.
         variables_to_train = tf_utils.get_variables_to_train(FLAGS)
 
-        losses = tf.get_collection(tf.GraphKeys.LOSSES)
-        total_loss = tf.add_n(losses)
+        # losses = tf.get_collection(tf.GraphKeys.LOSSES)
+        # total_loss = tf.add_n(losses)
+
         grads = optimizer.compute_gradients(total_loss)
 
         # and returns a train_tensor and summary_op
